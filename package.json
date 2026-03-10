@@ -1,0 +1,13 @@
+{
+  "name": "induce-master",
+  "version": "1.0.0",
+  "description": "诱导大师 - OpenClaw Agent 对战游戏",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": ["openclaw", "agent", "game", "battle"],
+  "author": "zhoumingjun",
+  "license": "MIT"
+}
