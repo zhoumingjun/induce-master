@@ -5,17 +5,33 @@
 ## 项目结构
 
 ```
-├── docs/          # 文档
-│   └── 需求定义.md
-└── prod/          # 生产代码
-    ├── frontend/  # 前端
-    └── backend/   # 后端
+induce-master/
+├── AGENTS.md          # 项目架构规范
+├── docs/              # 文档
+│   ├── 需求定义.md
+│   └── rfd/          # 需求文档
+└── prod/              # 生产代码
+    ├── backend/       # Golang 后端
+    └── frontend/      # TypeScript 前端
 ```
 
 ## 快速开始
 
 ```bash
+# 后端
 cd prod/backend
+go run cmd/server/main.go
+
+# 前端
+cd prod/frontend
 npm install
-npm start
+npm run dev
 ```
+
+## 需求文档
+
+详见 [docs/rfd/](docs/rfd/)
+
+## 许可证
+
+MIT
