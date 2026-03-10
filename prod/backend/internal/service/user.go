@@ -1,18 +1,12 @@
 package service
 
 import (
-	"github.com/golang-jwt/jwt/v5"
-	"gorm.io/gorm"
-)
+	"induce-master/internal/config"
+	"induce-master/internal/model"
+	"induce-master/internal/repository"
 
-type User struct {
-	ID           string
-	Username     string
-	DisplayName  string
-	PasswordHash string
-	AvatarURL    string
-	Rank         int
-}
+	"github.com/golang-jwt/jwt/v5"
+)
 
 type UserService struct {
 	repo   *repository.UserRepository
@@ -26,15 +20,15 @@ func NewUserService(repo *repository.UserRepository, cfg *config.Config) *UserSe
 	}
 }
 
-func (s *UserService) Create(user *User) error {
+func (s *UserService) Create(user *model.User) error {
 	return s.repo.Create(user)
 }
 
-func (s *UserService) GetByUsername(username string) (*User, error) {
+func (s *UserService) GetByUsername(username string) (*model.User, error) {
 	return s.repo.GetByUsername(username)
 }
 
-func (s *UserService) GetByID(id string) (*User, error) {
+func (s *UserService) GetByID(id string) (*model.User, error) {
 	return s.repo.GetByID(id)
 }
 

@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
+	"net/http"
 
 	"induce-master/internal/config"
 	"induce-master/internal/handler"
@@ -20,7 +19,7 @@ func main() {
 	cfg := config.Load()
 
 	// 初始化数据库
-	db, err := model.InitDB(cfg)
+	db, err := model.InitDB()
 	if err != nil {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
@@ -38,7 +37,7 @@ func main() {
 	// 初始化处理器
 	authHandler := handler.NewAuthHandler(userService, cfg)
 	roomHandler := handler.NewRoomHandler(roomService)
-	gameHandler := handler.NewGameHandler(gameService)
+	_ = handler.NewGameHandler(gameService) // TODO: 添加游戏相关路由
 
 	// 初始化 WebSocket Hub
 	hub := handler.NewHub(userService, roomService, gameService)
@@ -95,14 +94,14 @@ func main() {
 			return
 		}
 
-		if claims.UserID != userID {
+		if (*claims)["user_id"] != userID {
 			c.JSON(401, gin.H{"error": "token不匹配"})
 			return
 		}
 
 		// 升级为 WebSocket
 		upgrader := websocket.Upgrader{
-			CheckOrigin: func(r *gin.Context) bool {
+			CheckOrigin: func(r *http.Request) bool {
 				return true
 			},
 		}

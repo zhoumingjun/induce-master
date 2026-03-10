@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"induce-master/internal/config"
+	"induce-master/internal/model"
 	"induce-master/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -50,10 +52,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	// 创建用户（简化版）
-	user := &service.User{
+	user := &model.User{
+		ID:           uuid.New().String(),
 		Username:     req.Username,
 		DisplayName: req.DisplayName,
 		PasswordHash: string(hash),
+		Rank:        0,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	// 生成 Token
