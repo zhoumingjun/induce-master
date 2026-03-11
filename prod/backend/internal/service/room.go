@@ -88,3 +88,11 @@ func (s *RoomService) UpdateRoomStatus(roomID string, status int) error {
 	room.Status = status
 	return s.repo.Update(room)
 }
+
+func (s *RoomService) GetPlayerRooms(userID string) ([]*model.DBRoomPlayer, error) {
+	return s.repo.GetPlayerRooms(userID)
+}
+
+func (s *RoomService) GetUserByID(userID string) (*model.User, error) {
+	return s.repo.GetUserByID(userID)
+}

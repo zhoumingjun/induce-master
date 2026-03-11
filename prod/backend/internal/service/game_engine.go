@@ -94,7 +94,7 @@ func (g *GameEngine) ProcessMessage(userID, username, content string) *GameMessa
 		Time:     time.Now(),
 	}
 
-	// 检查是否说出对手的关键词
+	// 检查是否说出对手的关键词（严格匹配）
 	opponentWord := g.GetOpponentWord(userID)
 	if opponentWord != "" && containsKeyword(content, opponentWord) {
 		msg.IsKeyword = true
@@ -106,38 +106,31 @@ func (g *GameEngine) ProcessMessage(userID, username, content string) *GameMessa
 	return &msg
 }
 
-// containsKeyword 检查消息是否包含关键词
+// containsKeyword 检查消息是否严格包含关键词
+// 严格匹配：消息中必须完整包含关键词（可以有前后文）
 func containsKeyword(content, keyword string) bool {
-	// 直接字符串包含检查
-	contentRunes := []rune(content)
-	keywordRunes := []rune(keyword)
+	// 精确匹配：内容必须包含关键词完整文本
+	contentClean := normalizeString(content)
+	keywordClean := normalizeString(keyword)
 	
-	// 全字匹配
-	contentStr := string(contentRunes)
-	keywordStr := string(keywordRunes)
-	
-	return containsString(contentStr, keywordStr)
-}
-
-// containsString 字符串包含检查（忽略空格和标点）
-func containsString(s, substr string) bool {
-	// 清理字符串
-	s = cleanString(s)
-	substr = cleanString(substr)
-	
-	if len(s) == 0 || len(substr) == 0 {
+	if len(contentClean) == 0 || len(keywordClean) == 0 {
 		return false
 	}
 	
-	return len(s) >= len(substr) && (s == substr || findSubstring(s, substr))
+	// 检查是否包含完整关键词
+	return findSubstring(contentClean, keywordClean)
 }
 
-// cleanString 清理字符串
-func cleanString(s string) string {
+// normalizeString 规范化字符串（移除空格和标点，统一大小写）
+func normalizeString(s string) string {
 	result := make([]rune, 0)
 	for _, r := range s {
 		// 只保留中文、字母、数字
 		if (r >= '\u4e00' && r <= '\u9fff') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			// 字母转小写
+			if r >= 'A' && r <= 'Z' {
+				r = r + 32
+			}
 			result = append(result, r)
 		}
 	}

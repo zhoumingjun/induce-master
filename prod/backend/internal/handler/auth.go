@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"induce-master/internal/config"
@@ -51,7 +52,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// 创建用户（简化版）
+	// 创建用户
 	user := &model.User{
 		ID:           uuid.New().String(),
 		Username:     req.Username,
@@ -62,6 +63,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		UpdatedAt:   time.Now(),
 	}
 
+	// 保存到数据库
+	if err := h.userService.Create(user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败"})
+		return
+	}
+
 	// 生成 Token
 	token, err := h.generateToken(user.ID)
 	if err != nil {
@@ -70,10 +77,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"user_id": user.ID,
+		"success":   true,
+		"user_id":  user.ID,
 		"username": user.Username,
-		"token":   token,
+		"token":    token,
 	})
 }
 
@@ -117,17 +124,35 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 简化版：直接跳过验证
-		c.Set("user_id", "test-user")
+		// 解析 Token
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := h.userService.ValidateToken(tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效token"})
+			c.Abort()
+			return
+		}
+
+		// 从 claims 获取 user_id
+		userID := (*claims)["user_id"].(string)
+		c.Set("user_id", userID)
 		c.Next()
 	}
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID := c.GetString("user_id")
+	// 从数据库获取用户信息
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": userID,
-		"username": "test",
+		"user_id":     user.ID,
+		"username":    user.Username,
+		"display_name": user.DisplayName,
+		"rank":        user.Rank,
 	})
 }
 

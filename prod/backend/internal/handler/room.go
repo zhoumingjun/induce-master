@@ -11,10 +11,11 @@ import (
 
 type RoomHandler struct {
 	roomService *service.RoomService
+	hub        *Hub
 }
 
-func NewRoomHandler(roomService *service.RoomService) *RoomHandler {
-	return &RoomHandler{roomService: roomService}
+func NewRoomHandler(roomService *service.RoomService, hub *Hub) *RoomHandler {
+	return &RoomHandler{roomService: roomService, hub: hub}
 }
 
 func (h *RoomHandler) List(c *gin.Context) {
@@ -208,6 +209,26 @@ func (h *RoomHandler) Start(c *gin.Context) {
 		return
 	}
 
+	// 创建游戏引擎
+	playerIDs := make([]string, len(players))
+	for i, p := range players {
+		playerIDs[i] = p.UserID
+	}
+	game := h.hub.CreateGame(roomID, playerIDs)
+
+	// 通知所有玩家游戏开始
+	for i, p := range players {
+		word := game.GetWord(p.UserID)
+		var opponentID string
+		if i == 0 && len(players) > 1 {
+			opponentID = players[1].UserID
+		} else if i > 0 {
+			opponentID = players[0].UserID
+		}
+		
+		h.hub.SendGameStart(roomID, roomID, word, opponentID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true, "room_id": roomID})
 }
 
@@ -217,4 +238,72 @@ func parseInt(s string, def int) int {
 		return i
 	}
 	return def
+}
+
+// SendMessage 发送游戏消息 (供 AI Agent 使用)
+func (h *RoomHandler) SendMessage(c *gin.Context) {
+	roomID := c.Param("id")
+	
+	var req struct {
+		UserID  string `json:"user_id" binding:"required"`
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	
+	// 获取用户名
+	username := req.UserID
+	if user, err := h.roomService.GetUserByID(req.UserID); err == nil {
+		username = user.Username
+	}
+	
+	// 处理游戏消息
+	game := h.hub.GetGame(roomID)
+	if game == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "game not found"})
+		return
+	}
+	
+	// 检查是否是当前玩家的回合
+	currentPlayer := game.GetCurrentPlayer()
+	if currentPlayer != req.UserID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "not your turn"})
+		return
+	}
+	
+	// 处理消息
+	msg := h.hub.ProcessGameMessage(roomID, req.UserID, username, req.Content)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"is_keyword": msg != nil && msg.IsKeyword,
+		"score": game.Scores[req.UserID],
+	})
+}
+
+// GetGameStatus 获取游戏状态 (供 AI Agent 轮询)
+func (h *RoomHandler) GetGameStatus(c *gin.Context) {
+	roomID := c.Param("id")
+	
+	game := h.hub.GetGame(roomID)
+	if game == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "not_started",
+			"round": 0,
+		})
+		return
+	}
+	
+	// 获取当前玩家
+	currentPlayer := game.GetCurrentPlayer()
+	
+	c.JSON(http.StatusOK, gin.H{
+		"status": "playing",
+		"round": game.Round,
+		"max_rounds": game.MaxRounds,
+		"current_player": currentPlayer,
+		"scores": game.Scores,
+	})
 }

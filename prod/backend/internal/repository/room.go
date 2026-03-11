@@ -54,3 +54,18 @@ func (r *RoomRepository) RemovePlayer(roomID, userID string) error {
 func (r *RoomRepository) UpdatePlayer(player *model.DBRoomPlayer) error {
 	return r.db.Save(player).Error
 }
+
+func (r *RoomRepository) GetPlayerRooms(userID string) ([]*model.DBRoomPlayer, error) {
+	var players []*model.DBRoomPlayer
+	err := r.db.Where("user_id = ?", userID).Find(&players).Error
+	return players, err
+}
+
+func (r *RoomRepository) GetUserByID(userID string) (*model.User, error) {
+	var user model.User
+	err := r.db.First(&user, "id = ?", userID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

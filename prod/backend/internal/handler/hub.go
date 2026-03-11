@@ -33,6 +33,8 @@ type Hub struct {
 	userService  *service.UserService
 	roomService *service.RoomService
 	gameService *service.GameService
+	// 游戏引擎
+	Games map[string]*service.GameEngine
 }
 
 type Client struct {
@@ -97,6 +99,7 @@ func NewHub(userService *service.UserService, roomService *service.RoomService, 
 		userService:  userService,
 		roomService: roomService,
 		gameService: gameService,
+		Games:       make(map[string]*service.GameEngine),
 	}
 }
 
@@ -130,8 +133,11 @@ func (h *Hub) SendToUser(userID string, msg Message) {
 
 func (h *Hub) BroadcastToRoom(roomID string, msg Message) {
 	data, _ := json.Marshal(msg)
-	for _, client := range h.Clients {
-		if client.RoomID == roomID {
+	
+	// 从数据库获取房间内所有玩家
+	players, _ := h.roomService.GetPlayers(roomID)
+	for _, p := range players {
+		if client, ok := h.Clients[p.UserID]; ok {
 			select {
 			case client.Send <- data:
 			default:
@@ -198,7 +204,65 @@ func (h *Hub) SendGameStart(roomID string, gameID string, yourWord string, oppon
 		Payload: payload,
 	}
 
-	h.BroadcastToRoom(roomID, msg)
+	// 直接发送给房间内所有玩家（不通过 RoomID 过滤）
+	players, _ := h.roomService.GetPlayers(roomID)
+	for _, p := range players {
+		h.SendToUser(p.UserID, msg)
+	}
+}
+
+// CreateGame 创建游戏
+func (h *Hub) CreateGame(roomID string, players []string) *service.GameEngine {
+	engine := service.NewGameEngine(roomID, players, 10, 60)
+	engine.Start()
+	h.Games[roomID] = engine
+	return engine
+}
+
+// GetGame 获取游戏引擎
+func (h *Hub) GetGame(roomID string) *service.GameEngine {
+	return h.Games[roomID]
+}
+
+// ProcessGameMessage 处理游戏消息
+func (h *Hub) ProcessGameMessage(roomID string, userID string, username string, content string) *service.GameMessage {
+	engine := h.Games[roomID]
+	if engine == nil {
+		return nil
+	}
+
+	// 处理消息
+	msg := engine.ProcessMessage(userID, username, content)
+
+	// 广播消息
+	h.SendGameMessage(roomID, engine.Round, userID, username, content)
+
+	// 切换到下一个玩家
+	engine.NextTurn()
+
+	// 如果说出关键词，检查是否游戏结束
+	if msg.IsKeyword {
+		// 广播关键词触发
+		payload := map[string]interface{}{
+			"user_id":  userID,
+			"keyword":   engine.GetOpponentWord(userID),
+			"score":    engine.Scores[userID],
+		}
+		h.BroadcastToRoom(roomID, Message{
+			Type:    "keyword_triggered",
+			Payload: payload,
+		})
+
+		// 游戏结束
+		winner := userID
+		h.SendGameEnd(roomID, roomID, winner, engine.Scores, engine.Words)
+		delete(h.Games, roomID)
+
+		// 更新房间状态
+		h.roomService.UpdateRoomStatus(roomID, 0)
+	}
+
+	return msg
 }
 
 // SendGameMessage 推送游戏消息

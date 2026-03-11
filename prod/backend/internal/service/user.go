@@ -32,6 +32,11 @@ func (s *UserService) GetByID(id string) (*model.User, error) {
 	return s.repo.GetByID(id)
 }
 
+// GetUserByID GetUserByID 别名
+func (s *UserService) GetUserByID(id string) (*model.User, error) {
+	return s.repo.GetByID(id)
+}
+
 func (s *UserService) ValidateToken(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.config.JWT.Secret), nil
