@@ -242,11 +242,47 @@ func (h *Hub) ProcessGameMessage(roomID string, userID string, username string, 
 
 	// 如果说出关键词，检查是否游戏结束
 	if msg.IsKeyword {
+		// 计算胜负积分
+		// 规则：
+		// - 说出自己关键词 → 判负（0分），对手赢（3分）
+		// - 说出对手关键词 → 判胜（3分），对手输（0分）
+		// - 平局 → 各1分
+		
+		var winnerID string
+		finalScores := make(map[string]int)
+		
+		if msg.SelfKeyword {
+			// 说出自己关键词，判负
+			winnerID = "" // 没有赢家（输家已定）
+			for _, pid := range engine.Players {
+				if pid == userID {
+					finalScores[pid] = 0 // 说出自己关键词输
+				} else {
+					finalScores[pid] = 3 // 对手赢
+					winnerID = pid
+				}
+			}
+			log.Printf("游戏结束: %s 说出自己的关键词判负", userID)
+		} else if msg.OpponentKeyword {
+			// 说出对手关键词，判胜
+			winnerID = userID
+			for _, pid := range engine.Players {
+				if pid == userID {
+					finalScores[pid] = 3 // 说出对手关键词赢
+				} else {
+					finalScores[pid] = 0 // 对手输
+				}
+			}
+			log.Printf("游戏结束: %s 说出对手关键词判胜", userID)
+		}
+		
 		// 广播关键词触发
 		payload := map[string]interface{}{
-			"user_id":  userID,
+			"user_id":   userID,
 			"keyword":   engine.GetOpponentWord(userID),
-			"score":    engine.Scores[userID],
+			"self_keyword": msg.SelfKeyword,
+			"opponent_keyword": msg.OpponentKeyword,
+			"scores": finalScores,
 		}
 		h.BroadcastToRoom(roomID, Message{
 			Type:    "keyword_triggered",
@@ -254,11 +290,22 @@ func (h *Hub) ProcessGameMessage(roomID string, userID string, username string, 
 		})
 
 		// 游戏结束
-		winner := userID
-		h.SendGameEnd(roomID, roomID, winner, engine.Scores, engine.Words)
+		h.SendGameEnd(roomID, roomID, winnerID, finalScores, engine.Words)
 		delete(h.Games, roomID)
 
 		// 更新房间状态
+		h.roomService.UpdateRoomStatus(roomID, 0)
+	} else if engine.Round > engine.MaxRounds {
+		// 20回合平局，各得1分
+		finalScores := make(map[string]int)
+		for _, pid := range engine.Players {
+			finalScores[pid] = 1
+		}
+		
+		log.Printf("游戏结束: 平局，各得1分")
+		
+		h.SendGameEnd(roomID, roomID, "", finalScores, engine.Words)
+		delete(h.Games, roomID)
 		h.roomService.UpdateRoomStatus(roomID, 0)
 	}
 

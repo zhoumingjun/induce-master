@@ -20,6 +20,10 @@ type GameEngine struct {
 	CurrentTurn int // 当前发言玩家索引
 	Messages   []GameMessage
 	Status     GameStatus
+	
+	// 新增：记录关键词触发情况
+	SelfKeywordTriggered     string // 说出自己关键词的玩家ID
+	OpponentKeywordTriggered string // 说出对手关键词的玩家ID
 }
 
 // GameMessage 游戏消息
@@ -29,7 +33,9 @@ type GameMessage struct {
 	Username  string    `json:"username"`
 	Content   string    `json:"content"`
 	Time      time.Time `json:"time"`
-	IsKeyword bool      `json:"is_keyword"` // 是否说出关键词
+	IsKeyword bool      `json:"is_keyword"` // 是否触发关键词
+	SelfKeyword bool   `json:"self_keyword"` // 是否说出自己的关键词
+	OpponentKeyword bool `json:"opponent_keyword"` // 是否说出对手的关键词
 }
 
 // GameStatus 游戏状态
@@ -95,14 +101,22 @@ func (g *GameEngine) ProcessMessage(userID, username, content string) *GameMessa
 		Time:     time.Now(),
 	}
 
-	// 检查是否说出对手的关键词（严格匹配）
+	// 检查是否说出关键词
+	myWord := g.GetWord(userID)
 	opponentWord := g.GetOpponentWord(userID)
-	log.Printf("DEBUG: userID=%s, opponentWord=%s, content=%s", userID, opponentWord, content)
-	if opponentWord != "" && containsKeyword(content, opponentWord) {
-		log.Printf("DEBUG: 触发关键词! word=%s", opponentWord)
+	
+	// 检查是否说出自己的关键词（说错 - 判负）
+	if myWord != "" && containsKeyword(content, myWord) {
 		msg.IsKeyword = true
-		// 说出关键词扣分
-		g.Scores[userID] -= 10
+		msg.SelfKeyword = true  // 说出自己的关键词
+		g.SelfKeywordTriggered = userID  // 记录谁说了自己的关键词
+		log.Printf("DEBUG: %s 说出自己的关键词 %s! 判负!", userID, myWord)
+	} else if opponentWord != "" && containsKeyword(content, opponentWord) {
+		// 检查是否说出对手的关键词（说对 - 判胜）
+		msg.IsKeyword = true
+		msg.OpponentKeyword = true  // 说出对手的关键词
+		g.OpponentKeywordTriggered = userID  // 记录谁说了对手的关键词
+		log.Printf("DEBUG: %s 说出对手的关键词 %s! 判胜!", userID, opponentWord)
 	}
 
 	g.Messages = append(g.Messages, msg)
