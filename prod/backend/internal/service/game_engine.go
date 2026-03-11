@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log"
 	"math/rand"
 	"time"
 
@@ -96,7 +97,9 @@ func (g *GameEngine) ProcessMessage(userID, username, content string) *GameMessa
 
 	// 检查是否说出对手的关键词（严格匹配）
 	opponentWord := g.GetOpponentWord(userID)
+	log.Printf("DEBUG: userID=%s, opponentWord=%s, content=%s", userID, opponentWord, content)
 	if opponentWord != "" && containsKeyword(content, opponentWord) {
+		log.Printf("DEBUG: 触发关键词! word=%s", opponentWord)
 		msg.IsKeyword = true
 		// 说出关键词扣分
 		g.Scores[userID] -= 10
